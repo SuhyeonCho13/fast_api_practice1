@@ -5,3 +5,5 @@ second!
 /c/Users/user/.ssh/id_ed25519.pub
 
 nice to meet you
+
+뭔가 새로운 것
