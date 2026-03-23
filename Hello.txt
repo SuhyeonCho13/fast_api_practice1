@@ -6,6 +6,12 @@ second!
 
 nice to meet you
 
+<<<<<<< HEAD
 뭔가 새로운 것
 
 사과
+=======
+뭔가 새롭지않은것
+
+바나나
+>>>>>>> fruit
