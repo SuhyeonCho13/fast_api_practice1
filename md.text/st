@@ -1,0 +1,116 @@
+import streamlit as st
+import pandas as pd
+import random
+
+# --- 1. 첫 화면 설정 (과제 조건 3-1) ---
+st.set_page_config(page_title="JLPT Vocab Master", layout="wide")
+
+def main_header():
+    st.title("📖 JLPT 단어 마스터")
+    st.info("중간고사 대체 과제: Streamlit 활용 웹 애플리케이션")
+    
+    # 사이드바에 학번과 이름 표시 (본인 정보로 수정하세요)
+    st.sidebar.markdown("### 👤 과제 제출자 정보")
+    st.sidebar.write("**학번:** 2025XXXXX")  # 쑤님의 학번 입력
+    st.sidebar.write("**이름:** 조수현")
+    st.sidebar.markdown("---")
+
+# --- 2. 캐싱 기능 (과제 조건 3-3) ---
+@st.cache_data
+def load_data(file_path):
+    # 단어 데이터가 많으므로 캐싱을 통해 로딩 속도 최적화
+    df = pd.read_csv(file_path)
+    df = df.fillna("") # 빈 칸 처리
+    return df
+
+# --- 3. 로그인 기능 (과제 조건 3-2) ---
+def login():
+    if 'logged_in' not in st.session_state:
+        st.session_state.logged_in = False
+
+    if not st.session_state.logged_in:
+        st.subheader("🔑 로그인")
+        with st.form("login_form"):
+            user_id = st.text_input("아이디 (닉네임을 입력하세요)")
+            user_pw = st.text_input("비밀번호 (과제용: 1234)", type="password")
+            submitted = st.form_submit_button("로그인")
+            
+            if submitted:
+                if user_pw == "1234": # 간단한 비밀번호 확인 logic
+                    st.session_state.logged_in = True
+                    st.session_state.user_name = user_id
+                    st.rerun()
+                else:
+                    st.error("비밀번호가 틀렸습니다. (힌트: 1234)")
+        return False
+    return True
+
+# --- 4. 메인 앱 기능 ---
+def main():
+    main_header()
+    
+    if not login():
+        st.warning("먼저 로그인을 진행해 주세요.")
+        return
+
+    # 데이터 로드
+    try:
+        df = load_data('jlpt_vocab.csv')
+    except FileNotFoundError:
+        st.error("데이터 파일(jlpt_vocab.csv)을 찾을 수 없습니다.")
+        return
+    
+    menu = st.sidebar.selectbox("메뉴를 선택하세요", ["학습하기", "퀴즈 풀기"])
+
+    # --- 학습하기 모드 (토글 기능 및 사전 연결) ---
+    if menu == "학습하기":
+        st.header(f"📝 {st.session_state.user_name}님의 단어장")
+        
+        # 필터링 옵션
+        levels = sorted(df['JLPT Level'].unique())
+        selected_level = st.multiselect("학습할 레벨 선택", levels, default=["N5"])
+        
+        st.subheader("보기 옵션 (토글)")
+        c1, c2, c3 = st.columns(3)
+        show_kanji = c1.checkbox("한자 보기", value=True)
+        show_furi = c2.checkbox("후리가나 보기", value=True)
+        show_eng = c3.checkbox("의미 보기", value=True)
+
+        filtered_df = df[df['JLPT Level'].isin(selected_level)].sample(min(10, len(df)))
+
+        for i, row in filtered_df.iterrows():
+            with st.expander(f"단어 확인: {row['Original'] if show_kanji else '???'}"):
+                if show_furi: st.write(f"**읽기:** {row['Furigana']}")
+                if show_eng: st.write(f"**의미:** {row['English']}")
+                
+                # 사전 연결 (Jisho.org)
+                search_url = f"https://jisho.org/search/{row['Original']}"
+                st.markdown(f"[🔗 '{row['Original']}' 사전에서 보기]({search_url})")
+
+    # --- 퀴즈 모드 (과제 조건 3-4) ---
+    elif menu == "퀴즈 풀기":
+        st.header("❓ 단어 퀴즈")
+        
+        if 'quiz_data' not in st.session_state:
+            st.session_state.quiz_data = df.sample(1).iloc[0].to_dict()
+
+        q = st.session_state.quiz_data
+        st.title(f"Q. {q['Original']} ({q['Furigana']})")
+        st.write("위 단어의 뜻은 무엇일까요?")
+
+        user_input = st.text_input("정답 입력 (영어 의미를 입력하세요):")
+        
+        col_q1, col_q2 = st.columns(2)
+        if col_q1.button("정답 확인"):
+            if user_input.lower() in q['English'].lower() and user_input != "":
+                st.success(f"딩동댕! 정답입니다. \n\n 의미: {q['English']}")
+                st.balloons()
+            else:
+                st.error(f"틀렸습니다! 정답은 '{q['English']}' 입니다.")
+        
+        if col_q2.button("다음 문제"):
+            st.session_state.quiz_data = df.sample(1).iloc[0].to_dict()
+            st.rerun()
+
+if __name__ == "__main__":
+    main()
